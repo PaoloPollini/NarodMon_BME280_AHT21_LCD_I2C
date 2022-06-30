@@ -1,7 +1,7 @@
 /*
 (c)saigon 2017-2022  
 Written: Dec 09 2017.
-Last Updated: Jun 29 2022
+Last Updated: Jun 30 2022
   
   Метеостанция с отправкой данных на narodmon.ru
   Отправляет данные каждые 5 минут. Обновляет данные на экране каждые 10 сек.
@@ -49,7 +49,8 @@ int bar_array[6];                                     // Массив для х�
 String Hostname;                                      // Имя железки - выглядит как ESPAABBCCDDEEFF т.е. ESP+mac адрес.
 String place = "Рославль, ул.Ленина, 18";             // Адрес места нахождения железки для отображения в народном мониторинге
 //String place = "Стародубский район, с.Левенка";     // Адрес места нахождения железки для отображения в народном мониторинге
-float temp(NAN), tempin(NAN), hum(NAN), pres(NAN);    // Переменные датчика
+float tempin(NAN), humin(NAN), pres(NAN);             // Переменные датчика BME280
+float temp(NAN), hum(NAN);                            // Переменные датчика AHT21
 int a = 8;                                            // Переменная шага анимации. 1-7 рисуем график. 8 - очищаем график.
 
 Adafruit_AHTX0 aht;                 // Инициализируем датчик AHT21
@@ -195,7 +196,7 @@ void loop(){
   aver_sens(); // Вызываем функцию чтения данных с датчика
 
  //Отдаем строку с данными в ком порт
-   if (debug) Serial.println("Temp:" + String(temp) + " °C    Humidity:" + String(hum) + "%    Pressure:" + String(pres) + " mmHg   TempIn:" + String(tempin) + " °C   " + millis()/1000);
+   if (debug) Serial.println("Temp:" + String(temp) + " °C    Humidity:" + String(hum) + "%    Pressure:" + String(pres) + " mmHg   TempIn:" + String(tempin) + " °C  Humidity:" + String(humin) + "%  " + millis()/1000);
 
   //Перед выводом на экран проверяем идут ли данные с BME280
   if (String(pres) == "nan"){ 
@@ -243,12 +244,13 @@ void loop(){
 bool SendToNarodmon() { 
     WiFiClient client;
     String buf;
-    buf = "#" + Hostname + "#" + place + "\r\n"; // заголовок и ИМЯ, которое будет отображаться в народном мониторинге, чтоб не светить реальный мак адрес
-    buf = buf + "#TEMP#" + String(temp) + "\r\n"; //температура
-    buf = buf + "#TEMPIN#" + String(tempin) + "\r\n"; //температура
-    buf = buf + "#HUMID#" + String(hum) + "\r\n"; //влажность
-    buf = buf + "#PRESS#" + String(pres) + "\r\n"; //давление
-    buf = buf + "##\r\n"; // закрываем пакет
+    buf = "#" + Hostname + "#" + place + "\r\n";      // заголовок и ИМЯ, которое будет отображаться в народном мониторинге, чтоб не светить реальный мак адрес
+    buf = buf + "#TEMP#" + String(temp) + "\r\n";     //температура
+    buf = buf + "#TEMPIN#" + String(tempin) + "\r\n"; //температура в помещении
+    buf = buf + "#HUMID#" + String(hum) + "\r\n";     //влажность
+    buf = buf + "#HUMIDIN#" + String(humin) + "\r\n"; //влажность в помещении
+    buf = buf + "#PRESS#" + String(pres) + "\r\n";    //давление
+    buf = buf + "##\r\n";                             // закрываем пакет
  
     if (!client.connect("narodmon.ru", 8283)) { // попытка подключения
       Serial.println("Connection failed");
@@ -275,8 +277,7 @@ float aver_sens() {
    BME280::TempUnit tempUnit(BME280::TempUnit_Celsius);
    BME280::PresUnit presUnit(BME280::PresUnit_Pa);
 
-  float pressureBME = 0;
-  float temperatureBME = 0;
+  float pressureBME = 0, temperatureBME = 0, humidityBME = 0; 
   float presBME, tempBME, humBME;
   float temperatureAHT = 0, humidityAHT = 0;
   float tempAHT, humAHT;
@@ -286,6 +287,7 @@ float aver_sens() {
   bme.read(presBME, tempBME, humBME, tempUnit, presUnit); //Читаем данные с датчика
   pressureBME += presBME;
   temperatureBME += tempBME;
+  humidityBME += humBME;
   }
 
   // Получаем среднее значение температуры и влажности за 10 замеров с датчика AHT21
@@ -299,6 +301,7 @@ float aver_sens() {
   pres = pressureBME / 10;
   pres /= 133.3; // convert to mmHg
   tempin = temperatureBME / 10;
+  humin = humidityBME / 10;
   temp = temperatureAHT / 10;
   hum = humidityAHT / 10;
 }
